@@ -55,6 +55,7 @@ export default function CartDrawer() {
                     alt={item.productName}
                     width={64}
                     height={64}
+                    unoptimized
                     className="w-16 h-16 object-cover rounded-lg"
                   />
                 )}

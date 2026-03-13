@@ -8,15 +8,19 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const category = await prisma.category.findUnique({
-      where: { id: params.id },
+    const idOrSlug = params.id;
+
+    const category = await prisma.category.findFirst({
+      where: {
+        OR: [{ id: idOrSlug }, { slug: idOrSlug }],
+      },
       include: {
-        children: { where: { visible: true }, orderBy: { sortOrder: "asc" } },
+        children: { orderBy: { sortOrder: "asc" } },
         products: {
-          where: { visible: true },
           include: { variants: true },
           orderBy: { createdAt: "desc" },
         },
+        parent: true,
       },
     });
 
@@ -44,7 +48,15 @@ export async function PUT(
 
     const category = await prisma.category.update({
       where: { id: params.id },
-      data,
+      data: {
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        image: data.image,
+        parentId: data.parentId || null,
+        sortOrder: data.sortOrder ?? 0,
+        visible: data.visible ?? true,
+      },
     });
 
     return NextResponse.json(category);
@@ -63,10 +75,41 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const children = await prisma.category.findMany({
+      where: { parentId: params.id },
+      select: { id: true },
+    });
+
+    const allCatIds = [params.id, ...children.map((c) => c.id)];
+
+    const products = await prisma.product.findMany({
+      where: { categoryId: { in: allCatIds } },
+      select: { id: true },
+    });
+    const productIds = products.map((p) => p.id);
+
+    if (productIds.length > 0) {
+      await prisma.productVariant.deleteMany({
+        where: { productId: { in: productIds } },
+      });
+      await prisma.product.deleteMany({
+        where: { id: { in: productIds } },
+      });
+    }
+
+    if (children.length > 0) {
+      await prisma.category.deleteMany({
+        where: { parentId: params.id },
+      });
+    }
+
     await prisma.category.delete({ where: { id: params.id } });
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete category. It may have associated data." },
+      { status: 500 }
+    );
   }
 }

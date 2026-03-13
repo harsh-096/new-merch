@@ -1,14 +1,15 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { siteConfig } from "./config";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-GB", {
+  return new Intl.NumberFormat(siteConfig.locale, {
     style: "currency",
-    currency: "GBP",
+    currency: siteConfig.currency,
   }).format(price);
 }
 

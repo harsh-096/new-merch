@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Upload } from "lucide-react";
+import Image from "next/image";
+import { Plus, Trash2, Upload, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { slugify } from "@/lib/utils";
 
@@ -10,6 +11,8 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+  parentId: string | null;
+  parent?: { name: string } | null;
   children?: Category[];
 }
 
@@ -49,19 +52,31 @@ export default function NewProductPage() {
   ]);
 
   useEffect(() => {
-    fetch("/api/categories?parentOnly=true&includeChildren=true")
+    fetch("/api/categories?parentOnly=true&includeChildren=true&includeAll=true")
       .then((r) => r.json())
       .then((cats: Category[]) => {
         setCategories(cats);
         const flat: Category[] = [];
         cats.forEach((c) => {
           flat.push(c);
-          c.children?.forEach((ch) => flat.push(ch));
+          c.children?.forEach((ch) =>
+            flat.push({ ...ch, parent: { name: c.name } })
+          );
         });
         setAllCategories(flat);
       })
       .catch(() => {});
   }, []);
+
+  const getCloudinaryFolder = (categoryId: string): string => {
+    for (const parent of categories) {
+      if (parent.id === categoryId) return parent.name;
+      for (const child of parent.children || []) {
+        if (child.id === categoryId) return `${parent.name}/${child.name}`;
+      }
+    }
+    return "products";
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -69,11 +84,13 @@ export default function NewProductPage() {
 
     setUploading(true);
     const newImages: string[] = [];
+    const folder = getCloudinaryFolder(form.categoryId);
 
     for (const file of Array.from(files)) {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("folder", `products/${form.slug || "temp"}`);
+      fd.append("folder", folder);
+      fd.append("cleanNames", "true");
 
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       if (res.ok) {
@@ -84,6 +101,7 @@ export default function NewProductPage() {
 
     setForm((f) => ({ ...f, images: [...f.images, ...newImages] }));
     setUploading(false);
+    if (newImages.length) toast.success(`${newImages.length} image(s) uploaded`);
   };
 
   const handleTemplateUpload = async (
@@ -116,7 +134,11 @@ export default function NewProductPage() {
     setVariants(variants.filter((_, i) => i !== index));
   };
 
-  const updateVariant = (index: number, field: keyof Variant, value: string | number) => {
+  const updateVariant = (
+    index: number,
+    field: keyof Variant,
+    value: string | number
+  ) => {
     setVariants(
       variants.map((v, i) => (i === index ? { ...v, [field]: value } : v))
     );
@@ -157,19 +179,27 @@ export default function NewProductPage() {
           <h2 className="font-semibold mb-4">Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product Name
+              </label>
               <input
                 type="text"
                 required
                 value={form.name}
                 onChange={(e) =>
-                  setForm({ ...form, name: e.target.value, slug: slugify(e.target.value) })
+                  setForm({
+                    ...form,
+                    name: e.target.value,
+                    slug: slugify(e.target.value),
+                  })
                 }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Slug
+              </label>
               <input
                 type="text"
                 required
@@ -179,11 +209,15 @@ export default function NewProductPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Category
+              </label>
               <select
                 required
                 value={form.categoryId}
-                onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, categoryId: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
               >
                 <option value="">Select category...</option>
@@ -200,45 +234,73 @@ export default function NewProductPage() {
                   </optgroup>
                 ))}
               </select>
+              {form.categoryId && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Images will upload to:{" "}
+                  {getCloudinaryFolder(form.categoryId)}
+                </p>
+              )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (&pound;)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Base Price (&pound;)
+              </label>
               <input
                 type="number"
                 required
                 step="0.01"
                 min="0"
                 value={form.basePrice}
-                onChange={(e) => setForm({ ...form, basePrice: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    basePrice: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Short Description
+              </label>
               <input
                 type="text"
                 value={form.shortDescription}
-                onChange={(e) => setForm({ ...form, shortDescription: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, shortDescription: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Description
+              </label>
               <textarea
                 required
                 rows={4}
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Turnaround (days)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Turnaround (days)
+              </label>
               <input
                 type="number"
                 min="1"
                 value={form.turnaroundDays}
-                onChange={(e) => setForm({ ...form, turnaroundDays: parseInt(e.target.value) || 5 })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    turnaroundDays: parseInt(e.target.value) || 5,
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
               />
             </div>
@@ -247,7 +309,9 @@ export default function NewProductPage() {
                 <input
                   type="checkbox"
                   checked={form.featured}
-                  onChange={(e) => setForm({ ...form, featured: e.target.checked })}
+                  onChange={(e) =>
+                    setForm({ ...form, featured: e.target.checked })
+                  }
                   className="rounded"
                 />
                 Featured
@@ -256,7 +320,9 @@ export default function NewProductPage() {
                 <input
                   type="checkbox"
                   checked={form.visible}
-                  onChange={(e) => setForm({ ...form, visible: e.target.checked })}
+                  onChange={(e) =>
+                    setForm({ ...form, visible: e.target.checked })
+                  }
                   className="rounded"
                 />
                 Visible
@@ -265,7 +331,9 @@ export default function NewProductPage() {
                 <input
                   type="checkbox"
                   checked={form.artworkRequired}
-                  onChange={(e) => setForm({ ...form, artworkRequired: e.target.checked })}
+                  onChange={(e) =>
+                    setForm({ ...form, artworkRequired: e.target.checked })
+                  }
                   className="rounded"
                 />
                 Artwork Required
@@ -279,19 +347,25 @@ export default function NewProductPage() {
           <div className="flex flex-wrap gap-3 mb-4">
             {form.images.map((img, i) => (
               <div key={i} className="relative group">
-                <img
+                <Image
                   src={img}
                   alt=""
+                  width={96}
+                  height={96}
+                  unoptimized
                   className="w-24 h-24 rounded-lg object-cover border"
                 />
                 <button
                   type="button"
                   onClick={() =>
-                    setForm({ ...form, images: form.images.filter((_, j) => j !== i) })
+                    setForm({
+                      ...form,
+                      images: form.images.filter((_, j) => j !== i),
+                    })
                   }
                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             ))}
@@ -305,9 +379,15 @@ export default function NewProductPage() {
               multiple
               className="hidden"
               onChange={handleImageUpload}
-              disabled={uploading}
+              disabled={uploading || !form.categoryId}
             />
           </label>
+          {!form.categoryId && (
+            <p className="text-xs text-amber-600 mt-2">
+              Select a category first so images upload to the correct Cloudinary
+              folder.
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -360,7 +440,9 @@ export default function NewProductPage() {
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Variants (Size / Material / Quantity / Price)</h2>
+            <h2 className="font-semibold">
+              Variants (Size / Material / Quantity / Price)
+            </h2>
             <button
               type="button"
               onClick={addVariant}
@@ -372,9 +454,14 @@ export default function NewProductPage() {
 
           <div className="space-y-3">
             {variants.map((v, i) => (
-              <div key={i} className="flex flex-wrap items-end gap-3 p-3 bg-gray-50 rounded-lg">
+              <div
+                key={i}
+                className="flex flex-wrap items-end gap-3 p-3 bg-gray-50 rounded-lg"
+              >
                 <div className="flex-1 min-w-[120px]">
-                  <label className="block text-xs text-gray-500 mb-1">Size</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Size
+                  </label>
                   <input
                     type="text"
                     value={v.size}
@@ -384,17 +471,23 @@ export default function NewProductPage() {
                   />
                 </div>
                 <div className="flex-1 min-w-[120px]">
-                  <label className="block text-xs text-gray-500 mb-1">Material</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Material
+                  </label>
                   <input
                     type="text"
                     value={v.material}
-                    onChange={(e) => updateVariant(i, "material", e.target.value)}
+                    onChange={(e) =>
+                      updateVariant(i, "material", e.target.value)
+                    }
                     placeholder="e.g. 350gsm Silk"
                     className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm"
                   />
                 </div>
                 <div className="flex-1 min-w-[100px]">
-                  <label className="block text-xs text-gray-500 mb-1">Finish</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Finish
+                  </label>
                   <input
                     type="text"
                     value={v.finish}
@@ -404,23 +497,35 @@ export default function NewProductPage() {
                   />
                 </div>
                 <div className="w-24">
-                  <label className="block text-xs text-gray-500 mb-1">Qty</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Qty
+                  </label>
                   <input
                     type="number"
                     min="1"
                     value={v.quantity}
-                    onChange={(e) => updateVariant(i, "quantity", parseInt(e.target.value) || 1)}
+                    onChange={(e) =>
+                      updateVariant(i, "quantity", parseInt(e.target.value) || 1)
+                    }
                     className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm"
                   />
                 </div>
                 <div className="w-24">
-                  <label className="block text-xs text-gray-500 mb-1">Price (&pound;)</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Price (&pound;)
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={v.price}
-                    onChange={(e) => updateVariant(i, "price", parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateVariant(
+                        i,
+                        "price",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
                     className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm"
                   />
                 </div>

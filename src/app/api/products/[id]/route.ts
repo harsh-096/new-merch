@@ -94,6 +94,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await prisma.productVariant.deleteMany({ where: { productId: params.id } });
     await prisma.product.delete({ where: { id: params.id } });
 
     return NextResponse.json({ success: true });

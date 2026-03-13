@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Package, ChevronRight } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { siteConfig } from "@/lib/config";
 
 interface Order {
   id: string;
@@ -103,7 +104,7 @@ export default function AccountOrdersPage() {
                     {order.status.replace("_", " ")}
                   </span>
                   <span className="text-xs text-gray-400">
-                    {new Date(order.createdAt).toLocaleDateString("en-GB", {
+                    {new Date(order.createdAt).toLocaleDateString(siteConfig.locale, {
                       day: "numeric",
                       month: "short",
                       year: "numeric",

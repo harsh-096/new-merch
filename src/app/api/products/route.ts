@@ -9,13 +9,35 @@ export async function GET(req: NextRequest) {
     const categorySlug = searchParams.get("category");
     const featured = searchParams.get("featured") === "true";
     const search = searchParams.get("search");
+    const includeAll = searchParams.get("includeAll") === "true";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    const where: Record<string, unknown> = { visible: true };
+    const session = includeAll ? await getServerSession(authOptions) : null;
+    const isAdmin = session?.user?.role === "ADMIN";
+
+    const where: Record<string, unknown> = {};
+
+    if (!(includeAll && isAdmin)) {
+      where.visible = true;
+    }
 
     if (categorySlug) {
-      where.category = { slug: categorySlug };
+      const category = await prisma.category.findFirst({
+        where: { slug: categorySlug },
+        include: { children: { select: { id: true } } },
+      });
+
+      if (category) {
+        const childIds = category.children.map((c) => c.id);
+        if (childIds.length > 0) {
+          where.categoryId = { in: [category.id, ...childIds] };
+        } else {
+          where.category = { slug: categorySlug };
+        }
+      } else {
+        where.category = { slug: categorySlug };
+      }
     }
 
     if (featured) {
@@ -32,7 +54,7 @@ export async function GET(req: NextRequest) {
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: { category: true, variants: true },
+        include: { category: { include: { parent: true } }, variants: true },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
@@ -47,7 +69,10 @@ export async function GET(req: NextRequest) {
       totalPages: Math.ceil(total / limit),
     });
   } catch {
-    return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch products" },
+      { status: 500 }
+    );
   }
 }
 
@@ -76,7 +101,10 @@ export async function POST(req: NextRequest) {
     } = await req.json();
 
     if (!name || !slug || !description || !categoryId || basePrice == null) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     const product = await prisma.product.create({
@@ -119,6 +147,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(product, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create product" },
+      { status: 500 }
+    );
   }
 }

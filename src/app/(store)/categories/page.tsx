@@ -72,19 +72,21 @@ function CategoriesContent() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {searchResults.map((product) => (
               <Link
                 key={product.id}
                 href={`/products/${product.slug}`}
-                className="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
+                className="group bg-white rounded-lg border border-gray-100 overflow-hidden hover:shadow-md transition-all"
               >
-                <div className="aspect-[4/3] bg-gray-50 relative overflow-hidden">
+                <div className="aspect-square bg-gray-50 relative overflow-hidden">
                   {product.images[0] ? (
                     <Image
                       src={product.images[0]}
                       alt={product.name}
                       fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      unoptimized
                       className="object-cover group-hover:scale-105 transition-transform"
                     />
                   ) : (
@@ -93,14 +95,14 @@ function CategoriesContent() {
                     </div>
                   )}
                 </div>
-                <div className="p-4">
-                  <span className="text-xs text-primary-600 font-medium">
+                <div className="p-3">
+                  <span className="text-[11px] text-primary-600 font-medium">
                     {product.category.name}
                   </span>
-                  <h3 className="text-sm font-semibold text-gray-900 mt-1 group-hover:text-primary-600 transition">
+                  <h3 className="text-xs font-bold text-gray-900 mt-0.5 group-hover:text-primary-600 transition line-clamp-1">
                     {product.name}
                   </h3>
-                  <p className="text-sm font-bold text-gray-900 mt-2">
+                  <p className="text-xs font-bold text-gray-900 mt-1">
                     From {formatPrice(product.basePrice)}
                   </p>
                 </div>

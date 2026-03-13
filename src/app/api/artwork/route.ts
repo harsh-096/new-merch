@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { uploadToCloudinary } from "@/lib/cloudinary";
+import { uploadFile } from "@/lib/storage";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,18 +40,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const maxSize = 50 * 1024 * 1024; // 50MB for artwork
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json({ error: "File too large (max 50MB)" }, { status: 400 });
     }
 
     const folder = `artworks/${session.user.id}${productSlug ? `/${productSlug}` : ""}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await uploadToCloudinary(buffer, folder, "auto");
+    const result = await uploadFile(buffer, {
+      folder,
+      resourceType: "auto",
+    });
 
     return NextResponse.json({
       url: result.url,
-      publicId: result.publicId,
+      publicId: result.key,
       fileName: file.name,
     });
   } catch {

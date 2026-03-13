@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { siteConfig } from "@/lib/config";
 
 export interface CartItem {
   id: string;
@@ -78,7 +79,7 @@ export const useCartStore = create<CartState>()(
         get().items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
     }),
     {
-      name: "new-merch-cart",
+      name: siteConfig.cartStorageKey,
       partialize: (state) => ({ items: state.items }),
     }
   )

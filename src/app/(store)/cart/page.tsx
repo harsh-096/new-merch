@@ -179,6 +179,7 @@ export default function CartPage() {
                   alt={item.productName}
                   width={80}
                   height={80}
+                  unoptimized
                   className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
                 />
               ) : (
