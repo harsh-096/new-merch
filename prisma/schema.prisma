@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  IN_PRODUCTION
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  role      Role      @default(USER)
+  orders    Order[]
+  addresses Address[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  image       String?
+  parentId    String?
+  parent      Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children    Category[] @relation("SubCategories")
+  products    Product[]
+  sortOrder   Int        @default(0)
+  visible     Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+}
+
+model Product {
+  id                  String           @id @default(cuid())
+  name                String
+  slug                String           @unique
+  description         String
+  shortDescription    String?
+  categoryId          String
+  category            Category         @relation(fields: [categoryId], references: [id])
+  images              String[]
+  basePrice           Float
+  variants            ProductVariant[]
+  artworkRequired     Boolean          @default(true)
+  artworkTemplate     String?
+  artworkInstructions String?
+  turnaroundDays      Int              @default(5)
+  featured            Boolean          @default(false)
+  visible             Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size      String
+  material  String?
+  finish    String?
+  quantity  Int
+  price     Float
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  status      OrderStatus @default(PENDING)
+  addressId   String
+  address     Address     @relation(fields: [addressId], references: [id])
+  notes       String?
+  totalAmount Float
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  productName String
+  variantId   String?
+  size        String
+  material    String?
+  finish      String?
+  quantity    Int
+  unitPrice   Float
+  artworkUrl  String?
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  name      String
+  line1     String
+  line2     String?
+  city      String
+  county    String?
+  postcode  String
+  phone     String?
+  isDefault Boolean @default(false)
+  orders    Order[]
+}
